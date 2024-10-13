@@ -1,0 +1,44 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  email    String   @unique
+  streams  Stream[] // One user can have multiple streams
+  upvotes  Upvote[] // Link to the Upvote model
+}
+
+model Stream {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  creatorId  String    @map("_creatorId") @db.ObjectId
+  creator    User      @relation(fields: [creatorId], references: [id])
+  songs      Song[]    // One stream can have multiple songs
+  createdAt  DateTime  @default(now())
+}
+
+model Song {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  title      String
+  url        String
+  thumbnail  String
+  streamId   String    @map("_streamId") @db.ObjectId
+  stream     Stream    @relation(fields: [streamId], references: [id]) // The relation back to the Stream
+  upvotes    Upvote[]  // Link to the Upvote model for counting upvotes per song
+}
+
+model Upvote {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String    @map("_userId") @db.ObjectId
+  user      User      @relation(fields: [userId], references: [id]) // The relation to User
+  songId    String    @map("_songId") @db.ObjectId
+  song      Song      @relation(fields: [songId], references: [id]) // The relation to Song
+  @@unique([userId, songId]) // One upvote per user for each song
+  createdAt DateTime  @default(now())
+}
