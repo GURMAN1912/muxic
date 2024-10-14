@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
 import Image from 'next/image';
-import { ArrowBigUp, Router } from 'lucide-react';
+import { ArrowBigUp } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import ReactPlayer from 'react-player/youtube';
 import toast from 'react-hot-toast';
