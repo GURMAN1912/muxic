@@ -7,10 +7,11 @@ const Appbar = () => {
     const { data: session, status } = useSession();  // Destructured session and status
     const router = useRouter();
 
-    const handleSignOut = () => {
-        signOut();
-        router.push("/");  // Changed from router.back() to router.push("/") for redirection to the homepage
+    const handleSignOut = async () => {
+        router. push("/"); // Redirect to the homepage
+        await signOut(); // Wait for sign out to complete
     };
+    
 
     return (
         <div className='bg-dark DEFAULT z-10 fixed w-full shadow-2xl py-5'>

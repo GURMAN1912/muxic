@@ -13,6 +13,9 @@ const Page = () => {
 
   const router = useRouter();
   const session = useSession();
+  if(!session?.data?.user.id) {
+    router.push('/');
+  }
   const handleNewSubmit = async (e: any) => {
     e.preventDefault();
     if (!inputTitle) {
@@ -99,8 +102,10 @@ const Page = () => {
   }, [session]);
 
   return (
+    
     <div className="bg-gradient-to-br from-dark-gradient-from via-dark-gradient-via to-dark-gradient-to min-h-screen flex flex-col items-center">
       <Appbar />
+      
       <div className="flex flex-col gap-8 items-center justify-center py-12 w-full max-w-3xl">
         <div className="flex flex-col items-center bg-gray-900 bg-opacity-75 p-10 rounded-lg shadow-lg w-full">
           <h1 className="text-white text-4xl font-extrabold mb-6">Create or Join a Stream</h1>

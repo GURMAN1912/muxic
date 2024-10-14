@@ -4,8 +4,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import axios from 'axios';
 import Image from 'next/image';
-import { ArrowBigUp } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { ArrowBigUp, Router } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
 import ReactPlayer from 'react-player/youtube';
 import toast from 'react-hot-toast';
 
@@ -39,9 +39,14 @@ const Page = () => {
   const [streamData, setStreamData] = useState<Stream[]>([]);
 
   const streamId = usePathname().split('/')[2];
+  const router = useRouter();
 
   // Sort songs based on upvotes
   const sortedSongs = useMemo(() => songs.sort((a, b) => b.upvotes - a.upvotes), [songs]);
+  if(!session?.user.id) {
+    router.push('/');
+  }
+  
 
   useEffect(() => {
     const getStreamDetails = async () => {
@@ -120,6 +125,19 @@ const Page = () => {
 
   const handleUpvote = async (songId: string) => {
     try {
+      if (!userId) {
+        return;
+      }
+      if(votedSongs.some((vote) => vote.songId === songId && vote.userId === userId)) {
+        toast.error('Already upvoted', {
+          style: {
+            borderRadius: '10px',
+            background: '#333',
+            color: '#fff',
+          },
+        });
+        return;
+      }
       const res = await axios.post(`/api/streams/${streamId}/upvote`, { songId, userId });
       if (res.status === 200) {
         toast.success('Upvoted', {
@@ -129,7 +147,6 @@ const Page = () => {
             color: '#fff',
           },
         });
-        fetchVotes(); // Refresh votes after upvoting
       } else {
         toast.error('Already upvoted', {
           style: {
@@ -212,6 +229,7 @@ const Page = () => {
   return (
     <div className="bg-gradient-to-br from-dark-gradient-from via-dark-gradient-via to-dark-gradient-to min-h-screen flex flex-col">
       <Appbar />
+      
       <h1 className="text-white text-center text-3xl font-semibold mt-28">Stream ID: {streamId}</h1>
       <div className="flex flex-grow items-center justify-center py-4 px-4">
         <div className="flex flex-col gap-8 md:flex-row items-start justify-between w-full max-w-6xl space-y-8 md:space-y-0">
