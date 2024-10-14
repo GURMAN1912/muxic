@@ -11,7 +11,6 @@ const AddSongSchema = z.object({
   url: z.string(),       // YouTube URL of the song
   userId: z.string(),    // User who adds the song to the queue
 });
-
 interface Song {
   id: string;
   title: string;
@@ -37,30 +36,11 @@ export async function POST(req: NextRequest, { params }: { params: { streamId: s
       });
     }
 
-    // Extract video ID from the URL
-    const extractedId = data.url.split("?v=")[1]?.split("&")[0]; // Handle possible additional query parameters
-    if (!extractedId) {
-      return NextResponse.json({
-        message: "Unable to extract video ID"
-      }, {
-        status: 400
-      });
-    }
-
-    // Fetch video details from YouTube API
+    const extractedId = data.url.split("?v=")[1];
     const res = await youtubesearchapi.GetVideoDetails(extractedId);
+    console.log(res);
 
-    // Check if response contains thumbnail data
-    const thumbnails = res?.thumbnail?.thumbnails;
-    if (!thumbnails || thumbnails.length === 0) {
-      return NextResponse.json({
-        message: "No thumbnails found for this video"
-      }, {
-        status: 400
-      });
-    }
-
-    // Sort thumbnails by width to get the highest resolution
+    const thumbnails = await res?.thumbnail?.thumbnails;
     thumbnails.sort((a: { width: number }, b: { width: number }) => b.width - a.width);
     
     // Create the song in the database
@@ -80,20 +60,21 @@ export async function POST(req: NextRequest, { params }: { params: { streamId: s
       song
     });
   } catch (error) {
-    console.error("Error adding song:", error); // Log the error for debugging
+    console.error(error);
     return NextResponse.json(
-      { message: "Failed to add song to the stream", error: error instanceof Error ? error.message : error },
+      { message: "Failed to add song to the stream" },
       { status: 500 }
     );
   }
 }
+
 
 export async function GET(req: NextRequest, { params }: { params: { streamId: string } }) {
   const { streamId } = params;
 
   try {
     // Fetch songs for the specific stream
-    const songs: Song[] = await prismaClient.song.findMany({
+    const songs:Song[] = await prismaClient.song.findMany({
       where: {
         stream: { id: streamId }
       }
@@ -114,11 +95,12 @@ export async function GET(req: NextRequest, { params }: { params: { streamId: st
     });
 
     // Sort songs based on upvotes in descending order
-    const sortedSongs = songs.sort((a, b) => {
-      const upvotesA = a.upvotes ?? 0; // Default to 0 if undefined
-      const upvotesB = b.upvotes ?? 0; // Default to 0 if undefined
-      return upvotesB - upvotesA; // Sort in descending order
-    });
+    // Sort songs based on upvotes in descending order, using default value if undefined
+const sortedSongs = songs.sort((a, b) => {
+  const upvotesA = a.upvotes ?? 0; // Default to 0 if undefined
+  const upvotesB = b.upvotes ?? 0; // Default to 0 if undefined
+  return upvotesB - upvotesA; // Sort in descending order
+});
 
     return NextResponse.json({
       message: "Songs fetched and sorted by upvotes successfully",
@@ -126,9 +108,9 @@ export async function GET(req: NextRequest, { params }: { params: { streamId: st
     });
     
   } catch (error) {
-    console.error("Error fetching songs:", error); // Log the error for debugging
+    console.error("Error fetching songs:", error);
     return NextResponse.json(
-      { message: "Failed to fetch songs", error: error instanceof Error ? error.message : error },
+      { message: "Failed to fetch songs", error },
       { status: 500 }
     );
   }
