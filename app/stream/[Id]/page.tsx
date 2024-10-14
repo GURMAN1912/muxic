@@ -205,7 +205,7 @@ const Page = () => {
     if (sortedSongs.length > 0 && !currentSong) {
       setCurrentSong(sortedSongs[0]);
     }
-  }, []);
+  }, [currentSong, sortedSongs]);
 
   const unplayedSongs = sortedSongs.filter((song) => !playedSongs.includes(song.id));
 
