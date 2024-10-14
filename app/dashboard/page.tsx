@@ -7,8 +7,8 @@ import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
 const Page = () => {
-  const [inputTitle, setInputTitle] = React.useState<String>("");
-  const [inputId, setInputId] = React.useState<String>("");
+  const [inputTitle, setInputTitle] = React.useState<string>("");
+  const [inputId, setInputId] = React.useState<string>("");
   const [userStream, setUserStream] = React.useState<any[]>([]);
 
   const router = useRouter();

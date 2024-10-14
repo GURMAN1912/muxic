@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaClient } from "@/app/lib/db";
 import { z } from "zod";
-// @ts-ignore
+//@ts-expect-error
 import youtubesearchapi from "youtube-search-api";
 
-var YT_REGEX = /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:m\.)?(?:youtu(?:be)?\.com\/(?:v\/|embed\/|watch(?:\/|\?v=))|youtu\.be\/)((?:\w|-){11})(?:\S+)?$/;
+const YT_REGEX = /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:m\.)?(?:youtu(?:be)?\.com\/(?:v\/|embed\/|watch(?:\/|\?v=))|youtu\.be\/)((?:\w|-){11})(?:\S+)?$/;
 
 // Schema validation for adding a song to the queue
 const AddSongSchema = z.object({

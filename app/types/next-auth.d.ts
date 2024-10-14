@@ -1,3 +1,4 @@
+//@ts-expect-error
 import NextAuth from "next-auth";
 
 declare module "next-auth" {

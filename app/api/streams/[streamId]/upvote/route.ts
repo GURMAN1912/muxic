@@ -9,7 +9,7 @@ const UpvoteSchema = z.object({
 });
 
 // POST method to handle upvoting a song in the stream
-export async function POST(req: NextRequest, { params }: { params: { streamId: string } }) {
+export async function POST(req: NextRequest) {
   try {
     // Parse and validate the request body
     const data = UpvoteSchema.parse(await req.json());

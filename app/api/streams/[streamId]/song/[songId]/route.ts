@@ -3,7 +3,7 @@ import { prismaClient } from "@/app/lib/db";
 
 // DELETE: Remove a song from the stream's queue
 export async function DELETE(req: NextRequest, { params }: { params: { streamId: string, songId: string } }) {
-  const { streamId, songId } = params;
+  const { songId } = params;
 
   try {
     // First, delete all upvotes related to the song
