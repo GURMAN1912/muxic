@@ -34,3 +34,27 @@ export async function DELETE(req: NextRequest, { params }: { params: { streamId:
     );
   }
 }
+// PUT: Update the current song for a stream
+export async function PUT(req: NextRequest, { params }: { params: { streamId: string,songId:string } }) {
+  const { streamId } = params;
+  const { songId } = params
+
+  try {
+    // Update the stream's currentSongId
+    const updatedStream = await prismaClient.stream.update({
+      where: { id: streamId },
+      data: { currentSongId: songId },
+    });
+
+    return NextResponse.json({
+      message: "Current song updated successfully",
+      updatedStream,
+    });
+  } catch (error) {
+    console.error("Error updating current song:", error);
+    return NextResponse.json(
+      { message: "Failed to update the current song", error },
+      { status: 500 }
+    );
+  }
+}

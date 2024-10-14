@@ -17,6 +17,7 @@ model User {
 model Stream {
   id         String    @id @default(auto()) @map("_id") @db.ObjectId
   title      String
+  currentSongId String?    // The current song being played
   creatorId  String    @map("_creatorId") @db.ObjectId
   creator    User      @relation(fields: [creatorId], references: [id])
   songs      Song[]    // One stream can have multiple songs

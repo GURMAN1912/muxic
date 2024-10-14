@@ -11,6 +11,14 @@ const AddSongSchema = z.object({
   url: z.string(),       // YouTube URL of the song
   userId: z.string(),    // User who adds the song to the queue
 });
+interface Song {
+  id: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  streamId: string;
+  upvotes?: number; // Optional property for upvotes
+}
 
 export async function POST(req: NextRequest, { params }: { params: { streamId: string } }) {
   const { streamId } = params;
@@ -58,21 +66,50 @@ export async function POST(req: NextRequest, { params }: { params: { streamId: s
     );
   }
 }
+
+
 export async function GET(req: NextRequest, { params }: { params: { streamId: string } }) {
   const { streamId } = params;
+
   try {
-    // Fetch all songs in the stream's queue
-    const songs = await prismaClient.song.findMany({
+    // Fetch songs for the specific stream
+    const songs:Song[] = await prismaClient.song.findMany({
       where: {
         stream: { id: streamId }
       }
     });
 
-    return NextResponse.json({ songs });
+    // Fetch upvotes for the songs in the stream
+    const upvotes = await prismaClient.upvote.findMany({
+      where: {
+        song: {
+          streamId: streamId, // Ensure the song belongs to the stream
+        },
+      },
+    });
+
+    // Calculate upvotes for each song
+    songs.forEach(song => {
+      song.upvotes = upvotes.filter(upvote => upvote.songId === song.id).length;
+    });
+
+    // Sort songs based on upvotes in descending order
+    // Sort songs based on upvotes in descending order, using default value if undefined
+const sortedSongs = songs.sort((a, b) => {
+  const upvotesA = a.upvotes ?? 0; // Default to 0 if undefined
+  const upvotesB = b.upvotes ?? 0; // Default to 0 if undefined
+  return upvotesB - upvotesA; // Sort in descending order
+});
+
+    return NextResponse.json({
+      message: "Songs fetched and sorted by upvotes successfully",
+      songs: sortedSongs,
+    });
+    
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching songs:", error);
     return NextResponse.json(
-      { message: "Failed to fetch songs" },
+      { message: "Failed to fetch songs", error },
       { status: 500 }
     );
   }

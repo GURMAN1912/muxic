@@ -9,18 +9,38 @@ import { usePathname } from 'next/navigation';
 import ReactPlayer from 'react-player/youtube';
 import toast from 'react-hot-toast';
 
+// Define proper interfaces for Song, Vote, and Stream
+interface Song {
+  id: string;
+  url: string;
+  title: string;
+  thumbnail: string;
+  upvotes: number;
+}
+
+interface Vote {
+  songId: string;
+  userId: string;
+}
+
+interface Stream {
+  creatorId: string;
+  streams: Stream[];
+}
+
 const Page = () => {
   const { data: session } = useSession();
   const userId = session?.user.id;
   const [inputUrl, setInputUrl] = useState<string>('');
-  const [currentSong, setCurrentSong] = useState<any>(null); // Track the currently playing song
-  const [songs, setSongs] = useState<any[]>([]);
-  const [votedSongs, setVotedSongs] = useState<any[]>([]);
+  const [currentSong, setCurrentSong] = useState<Song | null>(null); // Track the currently playing song
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [votedSongs, setVotedSongs] = useState<Vote[]>([]);
   const [playedSongs, setPlayedSongs] = useState<string[]>([]); // To track played songs
-  const [streamData, setStreamData] = useState<any[]>([]);
+  const [streamData, setStreamData] = useState<Stream[]>([]);
 
   const streamId = usePathname().split('/')[2];
 
+  // Sort songs based on upvotes
   const sortedSongs = useMemo(() => songs.sort((a, b) => b.upvotes - a.upvotes), [songs]);
 
   useEffect(() => {
@@ -34,9 +54,10 @@ const Page = () => {
         console.log(e);
       }
     };
-
-    getStreamDetails();
-  }, [streamId]);
+    if (session && userId) {
+      getStreamDetails();
+    }
+  }, [session, userId, streamId]);
 
   const addSong = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +94,7 @@ const Page = () => {
       setVotedSongs(res.data.upvotes);
       setSongs((prevSongs) =>
         prevSongs.map((song) => {
-          const upvotes = res.data.upvotes.filter((vote: any) => vote.songId === song.id).length;
+          const upvotes = res.data.upvotes.filter((vote: Vote) => vote.songId === song.id).length;
           return { ...song, upvotes };
         })
       );
@@ -89,14 +110,13 @@ const Page = () => {
     const interval = setInterval(() => {
       fetchVotes(); // Fetch votes periodically
       fetchSongs();
-      if(streamData[0]?.creatorId !== userId)
-      {
-          handleUserSongData() // Fetch songs periodically
+      if (streamData[0]?.creatorId !== userId) {
+        handleUserSongData();
       }
-    }, 5000);
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [streamData, userId, streamId]);
 
   const handleUpvote = async (songId: string) => {
     try {
@@ -128,44 +148,66 @@ const Page = () => {
     return votedSongs?.filter((vote) => vote.songId === songId).length;
   };
 
-  const playNextSong = () => {
-    // Mark the current song as played
-    try{
-        axios.delete(`/api/streams/${streamId}/song/${currentSong.id}`);
-    }catch(e){
-        console.log(e);
-    }
-    setPlayedSongs((prevPlayed) => [...prevPlayed, currentSong?.id]);
-
-    // Find the next song with the highest votes that hasn't been played
-    const nextSong = sortedSongs.find((song) => !playedSongs.includes(song.id) && song.id !== currentSong?.id);
-
-    if (nextSong) {
-      setCurrentSong(nextSong); // Set the next song to play
-    } else {
-      setCurrentSong(null); // If no more songs, set currentSong to null
+  const playNextSong = async () => {
+    try {
+      // Remove the current song from the stream's queue
+      if (currentSong) {
+        await axios.delete(`/api/streams/${streamId}/song/${currentSong.id}`);
+      }
+  
+      // Add the current song to played songs
+      setPlayedSongs((prevPlayed) => [...prevPlayed, currentSong?.id || '']);
+  
+      // Find the next song to play from the sorted list of unplayed songs
+      const nextSong = sortedSongs.find(
+        (song) => !playedSongs.includes(song.id) && song.id !== currentSong?.id
+      );
+  
+      if (nextSong) {
+        setCurrentSong(nextSong);  // Update state with the new current song
+        
+        // Update the current song in the backend
+        await axios.put(`/api/streams/${streamId}/song/${nextSong.id}`, );
+      } else {
+        setCurrentSong(null); // No more songs in the queue
+      }
+  
+    } catch (error) {
+      console.error("Error playing the next song:", error);
     }
   };
-  const handleUserSongData = async () => {
-    const nextSong = sortedSongs.find((song) => !playedSongs.includes(song.id) && song.id !== currentSong?.id);
 
-    if (nextSong) {
-      setCurrentSong(nextSong); // Set the next song to play
-    } else {
-      setCurrentSong(null); // If no more songs, set currentSong to null
+  
+  const handleUserSongData = async () => {
+    try {
+      // Fetch the current song from the backend
+      const res = await axios.get(`/api/streams/${streamId}/currentSong`);
+  
+      if (res.status === 200) {
+        const currentSongId = res.data.currentSong.id;
+  
+        // Find the song in the songs list by currentSongId
+        const currentSongData = songs.find((song) => song.id === currentSongId);
+  
+        if (currentSongData) {
+          setCurrentSong(currentSongData);  // Set the current song for non-creator
+        } else {
+          setCurrentSong(null); // No current song found
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching current song for non-creator:", error);
     }
-}
+  };
+  
 
   useEffect(() => {
-    // If there are songs in the queue but no song is currently playing, start the first song
-     
     if (sortedSongs.length > 0 && !currentSong) {
       setCurrentSong(sortedSongs[0]);
     }
-  }, [sortedSongs, currentSong]);
+  }, []);
 
-  // Filter the queue to remove played songs
-  const unplayedSongs = sortedSongs.filter(song => !playedSongs.includes(song.id));
+  const unplayedSongs = sortedSongs.filter((song) => !playedSongs.includes(song.id));
 
   return (
     <div className="bg-gradient-to-br from-dark-gradient-from via-dark-gradient-via to-dark-gradient-to min-h-screen flex flex-col">
@@ -173,7 +215,6 @@ const Page = () => {
       <h1 className="text-white text-center text-3xl font-semibold mt-28">Stream ID: {streamId}</h1>
       <div className="flex flex-grow items-center justify-center py-4 px-4">
         <div className="flex flex-col gap-8 md:flex-row items-start justify-between w-full max-w-6xl space-y-8 md:space-y-0">
-
           {/* Player Section */}
           <div className="w-full md:w-1/3 bg-white bg-opacity-10 p-8 rounded-lg shadow-xl transition duration-300 hover:shadow-2xl space-y-4">
             <h1 className="text-4xl text-white font-bold text-center tracking-wide">Now Playing</h1>
@@ -197,7 +238,7 @@ const Page = () => {
                         controls={true}
                         width="100%"
                         height="360px"
-                        onEnded={playNextSong} // Trigger when song ends
+                        onEnded={playNextSong}
                         className="rounded-lg overflow-hidden shadow-md"
                       />
                     </div>
@@ -235,7 +276,7 @@ const Page = () => {
                       <span className="text-lg font-bold text-red-800">{countVotes(song.id)}</span>
                       <button
                         onClick={() => handleUpvote(song.id)}
-                        className="bg-green-500 text-white p-2 rounded-full hover:bg-green-400 transition"
+                        className="bg-green-500 text-white px-2 py-1 rounded-full shadow-md hover:bg-green-600 transition"
                       >
                         <ArrowBigUp className="w-5 h-5" />
                       </button>
@@ -243,33 +284,31 @@ const Page = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-center text-white">No songs in the queue.</p>
+                <p className="text-lg text-white">No songs in the queue</p>
               )}
             </div>
           </div>
 
-
-          {/* Add to Queue Section */}
-          <div className="w-full md:w-1/3 bg-white bg-opacity-10 p-8 rounded-lg shadow-xl transition duration-300 hover:shadow-2xl space-y-4">
-            <h1 className="text-4xl text-white font-bold text-center tracking-wide">Add Songs to Queue</h1>
-            <form onSubmit={addSong} className="flex flex-col gap-4">
-              <input
-                type="url"
-                value={inputUrl}
-                onChange={(e) => setInputUrl(e.target.value)}
-                placeholder="Enter YouTube URL"
-                className="bg-white bg-opacity-10 border border-gray-600 p-4 rounded-lg focus:outline-none focus:border-blue-500 transition"
-                required
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-500 transition"
-              >
-                Add Song
-              </button>
-            </form>
-          </div>
-
+          {/* Add Song Section */}
+            <div className="w-full md:w-1/3 bg-white bg-opacity-10 p-8 rounded-lg shadow-xl transition duration-300 hover:shadow-2xl space-y-4">
+              <h1 className="text-4xl text-white font-bold text-center tracking-wide">Add Song</h1>
+              <form onSubmit={addSong} className="flex flex-col gap-4">
+                <input
+                  type="url"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  placeholder="Enter YouTube URL"
+                  required
+                  className="p-4 rounded-lg bg-gray-900 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-md hover:bg-blue-700 transition"
+                >
+                  Add Song
+                </button>
+              </form>
+            </div>
         </div>
       </div>
     </div>

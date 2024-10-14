@@ -1,7 +1,7 @@
 "use client";
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import React, { use, useEffect } from 'react'
+import React, { useEffect } from 'react'
 
 const Redirects = () => {
     const session = useSession();
