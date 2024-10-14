@@ -1,70 +1,72 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaClient } from "@/app/lib/db";
 import { z } from "zod";
-//@ts-expect-error - Importing a non-TS module
-import youtubesearchapi from "youtube-search-api";
+import { google } from "googleapis"; // Import Google APIs
 
-const YT_REGEX = /^(?:(?:https?:)?\/\/)?(?:www\.)?(?:m\.)?(?:youtu(?:be)?\.com\/(?:v\/|embed\/|watch(?:\/|\?v=))|youtu\.be\/)((?:\w|-){11})(?:\S+)?$/;
+const youtube = google.youtube({ version: "v3", auth: process.env.YOUTUBE_API_KEY });
+interface Song {
+  id: string;
+  title: string;
+  url: string;
+  thumbnail: string;
+  upvotes?: number;
+}
 
 // Schema validation for adding a song to the queue
 const AddSongSchema = z.object({
   url: z.string(),       // YouTube URL of the song
   userId: z.string(),    // User who adds the song to the queue
 });
-interface Song {
-  id: string;
-  title: string;
-  url: string;
-  thumbnail: string;
-  streamId: string;
-  upvotes?: number; // Optional property for upvotes
-}
-
 export async function POST(req: NextRequest, { params }: { params: { streamId: string } }) {
   const { streamId } = params;
   try {
-    // Parse the request body
     const data = AddSongSchema.parse(await req.json());
 
-    // Validate if it's a valid YouTube URL
-    const isYT = data.url.match(YT_REGEX); 
-    if (!isYT) {
-      return NextResponse.json({
-        message: "Invalid YouTube URL"
-      }, {
-        status: 400
-      });
+    // Validate if it's a valid YouTube URL and extract video ID
+    const videoIdMatch = data.url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (!videoIdMatch) {
+      return NextResponse.json({ message: "Invalid YouTube URL" }, { status: 400 });
     }
 
-    const extractedId = data.url.split("?v=")[1];
-    const res = await youtubesearchapi.GetVideoDetails(extractedId);
-    console.log(res);
+    const videoId = videoIdMatch[1]; // Extracted video ID
 
-    const thumbnails = await res?.thumbnail?.thumbnails;
-    thumbnails.sort((a: { width: number }, b: { width: number }) => b.width - a.width);
+    // Fetch video details using Google API
+    const res = await youtube.videos.list({
+      part: ["snippet"], // Ensure this is an array of strings
+      id: [videoId],     // Pass videoId as an array of strings
+    });
+    console.log("Video details:", res.data);
+
+    // Check if items are defined and not empty
+    const videoDetails = res.data.items?.[0];
+    if (!videoDetails) {
+      return NextResponse.json({ message: "Video not found" }, { status: 404 });
+    }
+
+    const thumbnails = videoDetails?.snippet?.thumbnails;
+    if (!thumbnails || Object.keys(thumbnails).length === 0) {
+      return NextResponse.json({ message: "No thumbnails found" }, { status: 400 });
+    }
+
+    // Sort thumbnails by width
+    const sortedThumbnails = Object.values(thumbnails).sort((a, b) => b.width - a.width);
     
     // Create the song in the database
     const song = await prismaClient.song.create({
       data: {
-        title: res.title,
+        title: videoDetails?.snippet?.title ?? "Unknown title",
         url: data.url,
-        thumbnail: thumbnails[0].url,
+        thumbnail: sortedThumbnails[0].url,
         stream: {
-          connect: { id: streamId }  // Use the connect method to link the song to the stream
-        }
-      }
+          connect: { id: streamId },
+        },
+      },
     });
 
-    return NextResponse.json({
-      message: "Song added to stream",
-      song
-    });
+    return NextResponse.json({ message: "Song added to stream", song });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { message: "Failed to add song to the stream" },
-      { status: 500 }
-    );
+    console.error("Error adding song:", error);
+    return NextResponse.json({ message: "Failed to add song", error: error instanceof Error ? error.message : error }, { status: 500 });
   }
 }
 
